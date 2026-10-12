@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kraftbuch</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#1f6f5c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--text:#1d1d1b;--muted:#6b6a66;--line:#e3e1db;--accent:#1f6f5c;--accent-ink:#fff;--warn:#b5651d;--good:#2e7d32;--c3:#5a6fb0;--c4:#a04a7a;--soft:#eef4f1;--r:14px}
+@media (prefers-color-scheme: dark){:root{--bg:#141413;--card:#1e1e1c;--text:#ecebe6;--muted:#9c9a93;--line:#2f2e2b;--accent:#4fb39a;--accent-ink:#0d1f1a;--warn:#e0a060;--good:#7cc47f;--c3:#8fa3e6;--c4:#d98bb8;--soft:#1f2a26}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(12px + env(safe-area-inset-top)) 16px 8px;display:flex;justify-content:space-between;align-items:center;max-width:640px;margin:0 auto}
+h1{font-size:21px;margin:0;letter-spacing:-.01em}
+h2{font-size:19px;margin:0 0 10px}
+main{padding:0 16px calc(90px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav button{flex:1;padding:14px 4px;border:0;background:none;color:var(--muted);font-size:15px;font-weight:500}
+nav button.active{color:var(--accent);font-weight:700}
+.hidden{display:none!important}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin:10px 0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.title{font-weight:650;font-size:17px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.last{margin-top:8px}
+.ziel{margin-top:6px;font-size:14px}
+.hint{margin-top:8px;padding:8px 10px;border-radius:10px;font-size:14px;background:var(--soft)}
+.hint.steigern{color:var(--good);font-weight:600}
+.hint.reduzieren{color:var(--warn)}
+button{font:inherit;cursor:pointer;border-radius:10px}
+.primary{background:var(--accent);color:var(--accent-ink);border:0;padding:10px 16px;font-weight:600}
+.ghost{background:none;border:1px solid var(--line);color:var(--text);padding:9px 14px}
+.link{background:none;border:0;color:var(--accent);padding:8px 0 0;font-size:14px}
+button.small{padding:6px 10px;font-size:13px}
+.block{width:100%;margin-top:6px;padding:13px}
+.danger{color:#c0392b;border-color:#e6b0aa}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 0}
+input,select{display:block;width:100%;margin-top:4px;padding:11px 12px;font:inherit;font-size:16px;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px}
+input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.check{display:flex;align-items:center;gap:8px;color:var(--text);font-size:15px}
+.check input{width:auto;margin:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.reps{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px}
+.stepper{display:flex;align-items:center;gap:14px}
+.stepper button{width:40px;height:40px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:20px}
+.form .row{margin-top:12px}
+.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;flex-wrap:wrap}
+.actions .spacer{flex:1}
+.timer{display:flex;align-items:flex-end}
+.timer button{width:100%;padding:11px}
+.timer button.running{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-variant-numeric:tabular-nums}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.list .item{padding:10px 0;border-bottom:1px solid var(--line)}
+.list .item:last-child{border-bottom:0}
+.chartbox{position:relative;height:220px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.stats b{display:block;font-size:18px}
+.stats span{font-size:12px;color:var(--muted)}
+.stats .full{grid-column:1/-1;margin-top:4px}
+.badge{font-size:11px;font-weight:500;padding:2px 6px;border-radius:6px;background:var(--line);color:var(--muted);vertical-align:middle}
+dialog{border:0;border-radius:18px;padding:18px;width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 40px);background:var(--card);color:var(--text)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:50;max-width:90vw}
+.toast.err{background:#c0392b;color:#fff}
+.empty{text-align:center;padding:28px 14px}
+@media (max-width:380px){.stats{grid-template-columns:repeat(2,1fr)}.grid3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header><h1>Kraftbuch</h1><button id="logoutBtn" class="ghost small hidden">Konto</button></header>
+<main id="app"><p class="muted">Lade …</p></main>
+<nav id="nav" class="hidden">
+  <button data-tab="training" class="active">Training</button>
+  <button data-tab="geraete">Geräte</button>
+  <button data-tab="koerper">Körper</button>
+</nav>
+<dialog id="dlg"><div id="dlgBody"></div></dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="config.js"></script>
+<script>
+(() => {
+'use strict';
+const cfg = window.KRAFTBUCH_CONFIG || {};
+const app = document.getElementById('app');
+const nav = document.getElementById('nav');
+const dlg = document.getElementById('dlg');
+const dlgBody = document.getElementById('dlgBody');
+const logoutBtn = document.getElementById('logoutBtn');
+const $ = s => document.querySelector(s);
+
+if (!cfg.url || cfg.url.includes('DEIN-PROJEKT') || !window.supabase) {
+  app.innerHTML = `<div class="card"><h2>Einrichtung fehlt</h2><p>Bitte in <code>config.js</code> die Supabase-URL und den anon/publishable Key eintragen.</p></div>`;
+  return;
+}
+const sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+const S = { user: null, tab: 'training', geraete: [], eintraege: [], koerper: [] };
+const KATEGORIEN = ['Brust', 'Rücken', 'Beine', 'Schultern', 'Arme', 'Bauch', 'Sonstiges'];
+
+// ---------- Helfer ----------
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const heute = () => new Date().toLocaleDateString('sv-SE');
+const fmt = n => (n == null || n === '' || isNaN(n)) ? '–' : Number(n).toLocaleString('de-DE', { maximumFractionDigits: 2 });
+const fmtDatum = d => new Date(d + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+const num = v => (v === '' || v == null) ? null : Number(String(v).replace(',', '.'));
+const summe = a => a.reduce((x, y) => x + y, 0);
+
+let toastT;
+function toast(msg, err) {
+  let t = $('.toast'); if (!t) { t = document.createElement('div'); document.body.appendChild(t); }
+  t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg;
+  clearTimeout(toastT); toastT = setTimeout(() => t.remove(), err ? 4500 : 2000);
+}
+async function q(p) { const { data, error } = await p; if (error) { toast(error.message, true); throw error; } return data; }
+const sortE = () => S.eintraege.sort((a, b) => b.datum.localeCompare(a.datum) || b.erstellt_am.localeCompare(a.erstellt_am));
+const sortK = () => S.koerper.sort((a, b) => b.datum.localeCompare(a.datum) || b.erstellt_am.localeCompare(a.erstellt_am));
+const sortG = () => S.geraete.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+const letzter = id => S.eintraege.find(x => x.geraet_id === id);
+const eintraegeVon = id => S.eintraege.filter(x => x.geraet_id === id);
+
+function zerstoereCharts(root) { if (window.Chart) root.querySelectorAll('canvas').forEach(c => Chart.getChart(c)?.destroy()); }
+function setApp(html) { zerstoereCharts(app); app.innerHTML = html; }
+function oeffneDlg(html) { zerstoereCharts(dlgBody); stopTimer(); dlgBody.innerHTML = html; if (!dlg.open) dlg.showModal(); dlgBody.scrollTop = 0; }
+dlg.addEventListener('close', () => { stopTimer(); zerstoereCharts(dlgBody); });
+dlgBody.addEventListener('click', e => { if (e.target.closest('[data-close]')) dlg.close(); });
+
+// ---------- Steigerungslogik (doppelte Progression) ----------
+function vorschlag(g, e) {
+  if (!e) return { typ: 'neu', gewicht: null, text: `Startgewicht wählen: ${g.saetze_ziel} Sätze à ${g.wdh_min}–${g.wdh_max} Wdh.` };
+  const r = e.wiederholungen || [];
+  const kg = Number(e.gewicht_kg);
+  if (r.length >= g.saetze_ziel && r.every(x => x >= g.wdh_max)) {
+    const neu = kg + Number(g.steigerung_kg);
+    return { typ: 'steigern', gewicht: neu, text: `Steigern auf ${fmt(neu)} kg – letztes Mal alle Sätze mit ${g.wdh_max}+ Wdh. geschafft.` };
+  }
+  if (r.length && r.every(x => x < g.wdh_min)) {
+    return { typ: 'reduzieren', gewicht: kg, text: `${fmt(kg)} kg war schwer (unter ${g.wdh_min} Wdh.). Gewicht halten oder um ${fmt(g.steigerung_kg)} kg senken.` };
+  }
+  return { typ: 'halten', gewicht: kg, text: `${fmt(kg)} kg halten und Wiederholungen steigern – Ziel: alle Sätze ${g.wdh_max} Wdh.` };
+}
+
+// ---------- Pausen-Timer ----------
+let timerId = null;
+function stopTimer() { if (timerId) clearInterval(timerId); timerId = null; }
+function startTimer(btn, sek) {
+  stopTimer();
+  const ende = Date.now() + sek * 1000;
+  btn.classList.add('running');
+  const tick = () => {
+    const rest = Math.max(0, Math.round((ende - Date.now()) / 1000));
+    btn.textContent = rest > 0 ? `${Math.floor(rest / 60)}:${String(rest % 60).padStart(2, '0')}  ✕` : 'Pause vorbei ✓';
+    if (rest <= 0) { stopTimer(); btn.classList.remove('running'); navigator.vibrate?.([300, 150, 300]); }
+  };
+  tick(); timerId = setInterval(tick, 250);
+}
+
+// ---------- Login ----------
+function renderLogin() {
+  nav.classList.add('hidden'); logoutBtn.classList.add('hidden');
+  setApp(`<form id="loginF" class="card">
+    <h2>Anmelden</h2>
+    <label>Benutzername<input type="text" name="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
+    <label>Passwort<input type="password" name="pw" autocomplete="current-password" required></label>
+    <button class="primary block" type="submit" style="margin-top:16px">Anmelden</button>
+    <p class="muted small" id="loginMsg"></p>
+  </form>`);
+  $('#loginF').onsubmit = async e => {
+    e.preventDefault(); const f = e.target; $('#loginMsg').textContent = '';
+    const eingabe = f.email.value.trim().toLowerCase();
+    const email = eingabe.includes('@') ? eingabe : `${eingabe}@${cfg.benutzerDomain || 'kraftbuch.local'}`;
+    const { error } = await sb.auth.signInWithPassword({ email, password: f.pw.value });
+    if (error) $('#loginMsg').textContent = 'Anmeldung fehlgeschlagen: ' + error.message;
+  };
+}
+const benutzername = () => {
+  const m = S.user?.email || '';
+  const dom = '@' + (cfg.benutzerDomain || 'kraftbuch.local');
+  return m.endsWith(dom) ? m.slice(0, -dom.length) : m;
+};
+logoutBtn.onclick = kontoDlg;
+function kontoDlg() {
+  oeffneDlg(`<form id="pwF" class="form">
+    <h2>Konto</h2>
+    <p class="muted">Angemeldet als <b>${esc(benutzername())}</b></p>
+    <h2 style="font-size:16px;margin-top:18px">Passwort ändern</h2>
+    <input type="text" name="u" autocomplete="username" value="${esc(benutzername())}" hidden>
+    <label>Aktuelles Passwort<input type="password" name="alt" autocomplete="current-password" required></label>
+    <label>Neues Passwort (mind. 8 Zeichen)<input type="password" name="neu" autocomplete="new-password" minlength="8" required></label>
+    <label>Neues Passwort wiederholen<input type="password" name="neu2" autocomplete="new-password" minlength="8" required></label>
+    <p class="small" id="pwMsg" style="color:#c0392b"></p>
+    <div class="actions"><button type="button" class="ghost danger" id="abmelden">Abmelden</button><span class="spacer"></span>
+      <button type="button" class="ghost" data-close>Schließen</button><button class="primary" type="submit">Speichern</button></div>
+  </form>`);
+  $('#abmelden').onclick = () => { dlg.close(); sb.auth.signOut(); };
+  $('#pwF').onsubmit = async ev => {
+    ev.preventDefault(); const f = ev.target, msg = $('#pwMsg'); msg.textContent = '';
+    if (f.neu.value !== f.neu2.value) { msg.textContent = 'Die neuen Passwörter stimmen nicht überein.'; return; }
+    if (f.neu.value === f.alt.value) { msg.textContent = 'Das neue Passwort muss sich vom alten unterscheiden.'; return; }
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true;
+    try {
+      const pruef = await sb.auth.signInWithPassword({ email: S.user.email, password: f.alt.value });
+      if (pruef.error) { msg.textContent = 'Das aktuelle Passwort ist falsch.'; return; }
+      const { error } = await sb.auth.updateUser({ password: f.neu.value });
+      if (error) { msg.textContent = 'Ändern fehlgeschlagen: ' + error.message; return; }
+      dlg.close(); toast('Passwort geändert ✓');
+    } finally { btn.disabled = false; }
+  };
+}
+
+sb.auth.onAuthStateChange((_ev, session) => {
+  const u = session?.user || null;
+  if (u && S.user && u.id === S.user.id) return; // z. B. Token-Erneuerung
+  S.user = u;
+  setTimeout(() => u ? start() : renderLogin(), 0);
+});
+
+async function start() {
+  nav.classList.remove('hidden'); logoutBtn.classList.remove('hidden');
+  setApp('<p class="muted">Lade …</p>');
+  try {
+    const [g, e, k] = await Promise.all([
+      q(sb.from('geraete').select('*').order('name')),
+      q(sb.from('trainings_eintraege').select('*').order('datum', { ascending: false }).order('erstellt_am', { ascending: false }).limit(2000)),
+      q(sb.from('koerperwerte').select('*').order('datum', { ascending: false }).order('erstellt_am', { ascending: false }).limit(1000))
+    ]);
+    S.geraete = g; S.eintraege = e; S.koerper = k; sortG();
+  } catch { setApp('<div class="card">Daten konnten nicht geladen werden. Ist <code>schema.sql</code> in Supabase ausgeführt?</div>'); return; }
+  render();
+}
+
+// ---------- Navigation ----------
+nav.onclick = e => { const b = e.target.closest('button'); if (!b) return; S.tab = b.dataset.tab; render(); };
+function render() {
+  nav.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.tab === S.tab));
+  ({ training: renderTraining, geraete: renderGeraete, koerper: renderKoerper })[S.tab]();
+}
+
+// ---------- Training ----------
+function renderTraining() {
+  const aktive = S.geraete.filter(g => g.aktiv);
+  if (!aktive.length) {
+    setApp(`<div class="card empty"><p>Noch keine Geräte angelegt.</p><button class="primary" id="ersteG">Erstes Gerät anlegen</button></div>`);
+    $('#ersteG').onclick = () => geraetForm(); return;
+  }
+  setApp(aktive.map(g => {
+    const e = letzter(g.id), v = vorschlag(g, e);
+    return `<div class="card geraet" data-id="${g.id}">
+      <div class="row"><div><div class="title">${esc(g.name)}</div>${g.kategorie ? `<div class="muted small">${esc(g.kategorie)}</div>` : ''}</div>
+      <button class="primary" data-act="log">Eintragen</button></div>
+      <div class="last">${e ? `Zuletzt ${fmtDatum(e.datum)}: <b>${fmt(e.gewicht_kg)} kg</b> · ${e.wiederholungen.join(' / ')} Wdh.` : '<span class="muted">Noch kein Eintrag</span>'}</div>
+      ${e?.ziel_naechstes_mal ? `<div class="ziel">🎯 ${esc(e.ziel_naechstes_mal)}</div>` : ''}
+      <div class="hint ${v.typ}">${esc(v.text)}</div>
+      ${e ? '<button class="link" data-act="verlauf">Verlauf ansehen</button>' : ''}
+    </div>`;
+  }).join(''));
+  app.querySelectorAll('.geraet').forEach(el => {
+    const g = S.geraete.find(x => x.id === el.dataset.id);
+    el.querySelector('[data-act=log]').onclick = () => logForm(g);
+    const vb = el.querySelector('[data-act=verlauf]'); if (vb) vb.onclick = () => verlauf(g);
+  });
+}
+
+function logForm(g) {
+  const e = letzter(g.id), v = vorschlag(g, e);
+  const alteWdh = e?.wiederholungen || [];
+  let anz = g.saetze_ziel;
+  oeffneDlg(`<form id="logF" class="form">
+    <h2>${esc(g.name)}</h2>
+    <div class="hint ${v.typ}">${esc(v.text)}</div>
+    ${e?.ziel_naechstes_mal ? `<div class="ziel">🎯 Dein Ziel: ${esc(e.ziel_naechstes_mal)}</div>` : ''}
+    <div class="grid2">
+      <label>Datum<input type="date" name="datum" value="${heute()}" required></label>
+      <label>Gewicht (kg)<input name="gewicht" inputmode="decimal" value="${v.gewicht != null ? fmt(v.gewicht) : ''}" required></label>
+    </div>
+    <div class="row"><span>Sätze</span><div class="stepper"><button type="button" data-d="-1">−</button><b id="satzAnz">${anz}</b><button type="button" data-d="1">+</button></div></div>
+    <div id="repsBox" class="reps"></div>
+    <div class="grid2">
+      <label>Pause (Sek.)<input name="pause" type="number" inputmode="numeric" min="0" value="${e?.pause_sek ?? g.pause_sek}"></label>
+      <div class="timer"><button type="button" id="timerBtn" class="ghost">Pause starten</button></div>
+    </div>
+    <label>Ziel fürs nächste Mal<input name="ziel" placeholder="z. B. 3×12 mit ${v.gewicht != null ? fmt(v.gewicht) : '…'} kg"></label>
+    <label>Notiz<input name="notiz" placeholder="optional, z. B. Sitzhöhe 4"></label>
+    <div class="actions"><button type="button" class="ghost" data-close>Abbrechen</button><button class="primary" type="submit">Speichern</button></div>
+  </form>`);
+  const box = $('#repsBox');
+  const zeichne = () => {
+    const alt = [...box.querySelectorAll('input')].map(i => i.value);
+    box.innerHTML = Array.from({ length: anz }, (_, i) =>
+      `<label>Satz ${i + 1}<input type="number" inputmode="numeric" min="0" max="999" value="${alt[i] ?? ''}" placeholder="${alteWdh[i] ?? g.wdh_max}" required></label>`).join('');
+    $('#satzAnz').textContent = anz;
+  };
+  zeichne();
+  dlgBody.querySelectorAll('.stepper button').forEach(b => b.onclick = () => { anz = Math.max(1, Math.min(10, anz + Number(b.dataset.d))); zeichne(); });
+  const tb = $('#timerBtn');
+  tb.onclick = () => {
+    if (timerId) { stopTimer(); tb.classList.remove('running'); tb.textContent = 'Pause starten'; return; }
+    startTimer(tb, num($('#logF').pause.value) || g.pause_sek);
+  };
+  $('#logF').onsubmit = async ev => {
+    ev.preventDefault(); const f = ev.target;
+    const wdh = [...box.querySelectorAll('input')].map(i => parseInt(i.value, 10));
+    const kg = num(f.gewicht.value);
+    if (wdh.some(isNaN)) return toast('Bitte alle Sätze ausfüllen', true);
+    if (kg == null || isNaN(kg)) return toast('Bitte ein gültiges Gewicht eingeben', true);
+    const row = { geraet_id: g.id, datum: f.datum.value, gewicht_kg: kg, wiederholungen: wdh, pause_sek: num(f.pause.value), ziel_naechstes_mal: f.ziel.value.trim() || null, notiz: f.notiz.value.trim() || null };
+    const neu = await q(sb.from('trainings_eintraege').insert(row).select().single());
+    S.eintraege.unshift(neu); sortE(); dlg.close(); toast('Gespeichert 💪'); render();
+  };
+}
+
+function verlauf(g) {
+  const liste = eintraegeVon(g.id);
+  oeffneDlg(`<h2>${esc(g.name)}</h2>
+    ${liste.length > 1 && window.Chart ? '<div class="chartbox"><canvas id="vChart"></canvas></div>' : ''}
+    <div class="list">${liste.map(e => `<div class="item"><div><b>${fmtDatum(e.datum)}</b> · ${fmt(e.gewicht_kg)} kg · ${e.wiederholungen.join(' / ')} Wdh.${e.pause_sek ? ` · ${e.pause_sek}s` : ''}
+      ${e.ziel_naechstes_mal ? `<div class="muted small">🎯 ${esc(e.ziel_naechstes_mal)}</div>` : ''}${e.notiz ? `<div class="muted small">${esc(e.notiz)}</div>` : ''}</div>
+      <button class="ghost small" data-del="${e.id}">Löschen</button></div>`).join('') || '<p class="muted">Noch keine Einträge.</p>'}</div>
+    <div class="actions"><button class="ghost" data-close>Schließen</button></div>`);
+  if (liste.length > 1 && window.Chart) {
+    const asc = [...liste].reverse();
+    linienChart($('#vChart'), asc.map(e => fmtDatum(e.datum)), [
+      { label: 'Gewicht (kg)', data: asc.map(e => Number(e.gewicht_kg)), yAxisID: 'y' },
+      { label: 'Volumen (kg × Wdh.)', data: asc.map(e => Number(e.gewicht_kg) * summe(e.wiederholungen)), yAxisID: 'y1' }
+    ]);
+  }
+  dlgBody.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    if (!confirm('Diesen Eintrag löschen?')) return;
+    await q(sb.from('trainings_eintraege').delete().eq('id', b.dataset.del));
+    S.eintraege = S.eintraege.filter(x => x.id !== b.dataset.del);
+    render(); eintraegeVon(g.id).length ? verlauf(g) : dlg.close();
+  });
+}
+
+// ---------- Geräte ----------
+function renderGeraete() {
+  setApp(`<button class="primary block" id="neuG">+ Gerät anlegen</button>
+    ${S.geraete.map(g => `<div class="card item" data-id="${g.id}"><div>
+      <div class="title">${esc(g.name)}${g.aktiv ? '' : ' <span class="badge">pausiert</span>'}</div>
+      <div class="muted small">${g.saetze_ziel} Sätze · ${g.wdh_min}–${g.wdh_max} Wdh. · +${fmt(g.steigerung_kg)} kg · ${g.pause_sek}s Pause${g.kategorie ? ' · ' + esc(g.kategorie) : ''}</div>
+      ${g.notiz ? `<div class="muted small">${esc(g.notiz)}</div>` : ''}</div>
+      <button class="ghost small">Bearbeiten</button></div>`).join('')}`);
+  $('#neuG').onclick = () => geraetForm();
+  app.querySelectorAll('.item').forEach(el => el.querySelector('button').onclick = () => geraetForm(S.geraete.find(x => x.id === el.dataset.id)));
+}
+
+function geraetForm(g) {
+  const d = g || { name: '', kategorie: '', saetze_ziel: 3, wdh_min: 8, wdh_max: 12, steigerung_kg: 2.5, pause_sek: 90, notiz: '', aktiv: true };
+  oeffneDlg(`<form id="gF" class="form">
+    <h2>${g ? 'Gerät bearbeiten' : 'Neues Gerät'}</h2>
+    <label>Name<input name="name" value="${esc(d.name)}" placeholder="z. B. Brustpresse" required></label>
+    <label>Muskelgruppe<input name="kategorie" list="katList" value="${esc(d.kategorie)}" placeholder="optional"></label>
+    <datalist id="katList">${KATEGORIEN.map(k => `<option value="${k}">`).join('')}</datalist>
+    <div class="grid3">
+      <label>Sätze<input name="saetze" type="number" inputmode="numeric" min="1" max="10" value="${d.saetze_ziel}" required></label>
+      <label>Wdh. min<input name="wmin" type="number" inputmode="numeric" min="1" value="${d.wdh_min}" required></label>
+      <label>Wdh. max<input name="wmax" type="number" inputmode="numeric" min="1" value="${d.wdh_max}" required></label>
+    </div>
+    <div class="grid2">
+      <label>Steigerung (kg)<input name="stg" inputmode="decimal" value="${fmt(d.steigerung_kg)}" required></label>
+      <label>Pause (Sek.)<input name="pause" type="number" inputmode="numeric" min="0" value="${d.pause_sek}" required></label>
+    </div>
+    <label>Notiz / Einstellung<input name="notiz" value="${esc(d.notiz)}" placeholder="z. B. Sitz Stufe 4, Lehne 2"></label>
+    ${g ? `<label class="check"><input type="checkbox" name="aktiv" ${d.aktiv ? 'checked' : ''}> Im Training anzeigen</label>` : ''}
+    <div class="actions">${g ? '<button type="button" class="ghost danger" id="delG">Löschen</button><span class="spacer"></span>' : ''}
+      <button type="button" class="ghost" data-close>Abbrechen</button><button class="primary" type="submit">Speichern</button></div>
+  </form>`);
+  $('#gF').onsubmit = async ev => {
+    ev.preventDefault(); const f = ev.target;
+    const row = { name: f.name.value.trim(), kategorie: f.kategorie.value.trim() || null, saetze_ziel: +f.saetze.value, wdh_min: +f.wmin.value, wdh_max: +f.wmax.value, steigerung_kg: num(f.stg.value), pause_sek: +f.pause.value, notiz: f.notiz.value.trim() || null };
+    if (g) row.aktiv = f.aktiv.checked;
+    if (row.wdh_min > row.wdh_max) return toast('Wdh. min darf nicht größer als max sein', true);
+    if (row.steigerung_kg == null || isNaN(row.steigerung_kg)) return toast('Bitte gültige Steigerung eingeben', true);
+    if (g) {
+      const upd = await q(sb.from('geraete').update(row).eq('id', g.id).select().single());
+      Object.assign(g, upd);
+    } else {
+      S.geraete.push(await q(sb.from('geraete').insert(row).select().single()));
+    }
+    sortG(); dlg.close(); toast('Gespeichert'); render();
+  };
+  if (g) $('#delG').onclick = async () => {
+    const n = eintraegeVon(g.id).length;
+    if (!confirm(`„${g.name}“ löschen?${n ? ` Dabei werden auch ${n} Trainingseinträge gelöscht. Tipp: Stattdessen „Im Training anzeigen“ abhaken.` : ''}`)) return;
+    await q(sb.from('geraete').delete().eq('id', g.id));
+    S.geraete = S.geraete.filter(x => x.id !== g.id); S.eintraege = S.eintraege.filter(x => x.geraet_id !== g.id);
+    dlg.close(); render();
+  };
+}
+
+// ---------- Körper ----------
+function renderKoerper() {
+  const l = S.koerper[0], vor = S.koerper[1];
+  let delta = '';
+  if (l && vor && l.gewicht_kg != null && vor.gewicht_kg != null) {
+    const d = l.gewicht_kg - vor.gewicht_kg;
+    delta = ` · Gewicht seit ${fmtDatum(vor.datum)}: ${d > 0 ? '+' : ''}${fmt(d)} kg`;
+  }
+  const mitCharts = S.koerper.length > 1 && window.Chart;
+  setApp(`<button class="primary block" id="neuK">+ Messung eintragen</button>
+    ${l ? `<div class="card stats">
+      <div><span>Gewicht</span><b>${fmt(l.gewicht_kg)}</b><span>kg</span></div>
+      <div><span>Muskel</span><b>${fmt(l.muskel_pct)}</b><span>%</span></div>
+      <div><span>Fett</span><b>${fmt(l.fett_pct)}</b><span>%</span></div>
+      <div><span>Inneres Fett</span><b>${fmt(l.viszeral_fett)}</b><span>Level</span></div>
+      <div class="full muted small">Stand ${fmtDatum(l.datum)}${delta}</div></div>` : '<div class="card empty muted">Noch keine Messungen.</div>'}
+    ${mitCharts ? `<div class="card"><div class="chartbox"><canvas id="kc1"></canvas></div></div>
+      <div class="card"><div class="chartbox"><canvas id="kc2"></canvas></div></div>` : ''}
+    ${S.koerper.length ? `<div class="card list">${S.koerper.map(k => `<div class="item" data-id="${k.id}"><div><b>${fmtDatum(k.datum)}</b>
+      <div class="muted small">${fmt(k.gewicht_kg)} kg · Muskel ${fmt(k.muskel_pct)} % · Fett ${fmt(k.fett_pct)} % · Inneres Fett ${fmt(k.viszeral_fett)}</div>
+      ${k.notiz ? `<div class="muted small">${esc(k.notiz)}</div>` : ''}</div><button class="ghost small">Bearbeiten</button></div>`).join('')}</div>` : ''}`);
+  $('#neuK').onclick = () => koerperForm();
+  app.querySelectorAll('.list .item').forEach(el => el.querySelector('button').onclick = () => koerperForm(S.koerper.find(x => x.id === el.dataset.id)));
+  if (mitCharts) {
+    const asc = [...S.koerper].reverse(), labels = asc.map(k => fmtDatum(k.datum));
+    linienChart($('#kc1'), labels, [{ label: 'Gewicht (kg)', data: asc.map(k => k.gewicht_kg == null ? null : Number(k.gewicht_kg)) }]);
+    linienChart($('#kc2'), labels, [
+      { label: 'Muskel %', data: asc.map(k => k.muskel_pct == null ? null : Number(k.muskel_pct)) },
+      { label: 'Fett %', data: asc.map(k => k.fett_pct == null ? null : Number(k.fett_pct)) },
+      { label: 'Inneres Fett', data: asc.map(k => k.viszeral_fett == null ? null : Number(k.viszeral_fett)) }
+    ]);
+  }
+}
+
+function koerperForm(k) {
+  const d = k || {};
+  const v = x => x == null ? '' : fmt(x);
+  oeffneDlg(`<form id="kF" class="form">
+    <h2>${k ? 'Messung bearbeiten' : 'Neue Messung'}</h2>
+    <label>Datum<input type="date" name="datum" value="${d.datum || heute()}" required></label>
+    <div class="grid2">
+      <label>Gewicht (kg)<input name="gew" inputmode="decimal" value="${v(d.gewicht_kg)}"></label>
+      <label>Muskel (%)<input name="mus" inputmode="decimal" value="${v(d.muskel_pct)}"></label>
+      <label>Fett (%)<input name="fett" inputmode="decimal" value="${v(d.fett_pct)}"></label>
+      <label>Inneres Fett (Level)<input name="visz" inputmode="decimal" value="${v(d.viszeral_fett)}"></label>
+    </div>
+    <label>Notiz<input name="notiz" value="${esc(d.notiz)}" placeholder="optional, z. B. morgens nüchtern"></label>
+    <div class="actions">${k ? '<button type="button" class="ghost danger" id="delK">Löschen</button><span class="spacer"></span>' : ''}
+      <button type="button" class="ghost" data-close>Abbrechen</button><button class="primary" type="submit">Speichern</button></div>
+  </form>`);
+  $('#kF').onsubmit = async ev => {
+    ev.preventDefault(); const f = ev.target;
+    const row = { datum: f.datum.value, gewicht_kg: num(f.gew.value), muskel_pct: num(f.mus.value), fett_pct: num(f.fett.value), viszeral_fett: num(f.visz.value), notiz: f.notiz.value.trim() || null };
+    const werte = [row.gewicht_kg, row.muskel_pct, row.fett_pct, row.viszeral_fett];
+    if (werte.every(x => x == null)) return toast('Bitte mindestens einen Wert eintragen', true);
+    if (werte.some(x => x != null && isNaN(x))) return toast('Bitte nur Zahlen eintragen', true);
+    if (k) Object.assign(k, await q(sb.from('koerperwerte').update(row).eq('id', k.id).select().single()));
+    else S.koerper.push(await q(sb.from('koerperwerte').insert(row).select().single()));
+    sortK(); dlg.close(); toast('Gespeichert'); render();
+  };
+  if (k) $('#delK').onclick = async () => {
+    if (!confirm('Diese Messung löschen?')) return;
+    await q(sb.from('koerperwerte').delete().eq('id', k.id));
+    S.koerper = S.koerper.filter(x => x.id !== k.id); dlg.close(); render();
+  };
+}
+
+// ---------- Diagramme ----------
+function linienChart(canvas, labels, datasets) {
+  if (!window.Chart || !canvas) return;
+  const cs = getComputedStyle(document.documentElement), c = n => cs.getPropertyValue(n).trim();
+  const farben = [c('--accent'), c('--warn'), c('--c3'), c('--c4')];
+  const zweiAchsen = datasets.some(d => d.yAxisID === 'y1');
+  return new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets: datasets.map((d, i) => ({ borderColor: farben[i], backgroundColor: farben[i], tension: .25, pointRadius: 3, spanGaps: true, ...d })) },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: c('--muted'), boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { color: c('--muted'), maxRotation: 0, autoSkip: true }, grid: { color: c('--line') } },
+        y: { position: 'left', ticks: { color: c('--muted') }, grid: { color: c('--line') } },
+        ...(zweiAchsen ? { y1: { position: 'right', ticks: { color: c('--muted') }, grid: { drawOnChartArea: false } } } : {})
+      }
+    }
+  });
+}
+
+window.__kraftbuchTest = { vorschlag };
+})();
+</script>
+</body>
+</html>

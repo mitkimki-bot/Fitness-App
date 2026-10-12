@@ -6,5 +6,5 @@ window.KRAFTBUCH_CONFIG = {
   anonKey: 'sb_publishable_QIfHVKjYjPbSPTmo-Hb8eQ_KoHda8GV',
   // Login mit Benutzername: aus "kim" wird intern "kim@kraftbuch.local".
   // Lege den Benutzer in Supabase genau mit dieser Adresse an.
-  benutzerDomain: 'kraftbuch.local'
+  benutzerDomain: 'Fitness-App.local'
 };

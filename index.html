@@ -56,6 +56,11 @@ table.saetze td:first-child,table.saetze th:first-child{padding-left:0;text-alig
 .geraet.trainiert{border-color:var(--rot);background:var(--rot-bg)}
 .geraet.trainiert .title{color:var(--rot)}
 .geraet.pausiert{opacity:.55;padding:10px 14px}
+.pool{gap:12px;padding:10px 12px}
+.star{background:none;border:0;font-size:26px;line-height:1;padding:4px 2px;color:var(--muted);min-width:34px}
+.star.an{color:#e0a800}
+.abschnitt{margin:18px 0 0;font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em}
+input:disabled{opacity:.6}
 .gruppe{margin:22px 2px 4px;font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .stepper{display:flex;align-items:center;gap:14px}
 .stepper button{width:40px;height:40px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:20px}
@@ -111,7 +116,7 @@ if (!cfg.url || cfg.url.includes('DEIN-PROJEKT') || !window.supabase) {
   return;
 }
 const sb = window.supabase.createClient(cfg.url, cfg.anonKey);
-const S = { user: null, tab: 'training', geraete: [], eintraege: [], koerper: [] };
+const S = { user: null, tab: 'training', geraete: [], meine: [], eintraege: [], koerper: [], suche: '' };
 const KATEGORIEN = ['Brust', 'Rücken', 'Beine', 'Schultern', 'Arme', 'Bauch', 'Sonstiges'];
 
 // ---------- Helfer ----------
@@ -134,6 +139,8 @@ const sortK = () => S.koerper.sort((a, b) => b.datum.localeCompare(a.datum) || b
 const sortG = () => S.geraete.sort((a, b) => a.name.localeCompare(b.name, 'de'));
 const letzter = id => S.eintraege.find(x => x.geraet_id === id);
 const eintraegeVon = id => S.eintraege.filter(x => x.geraet_id === id);
+const mein = id => S.meine.find(m => m.geraet_id === id);           // meine Favoriten-Zeile (oder undefined)
+const vonMir = g => g.user_id === S.user?.id;                          // habe ich das Gerät im Pool angelegt?
 
 function zerstoereCharts(root) { if (window.Chart) root.querySelectorAll('canvas').forEach(c => Chart.getChart(c)?.destroy()); }
 function setApp(html) { zerstoereCharts(app); app.innerHTML = html; }
@@ -167,7 +174,9 @@ function tageSeit(datum) {
 }
 const wannText = t => t <= 0 ? 'heute' : t === 1 ? 'gestern' : `vor ${t} Tagen`;
 function status(g) {
-  if (!g.aktiv) return 'pausiert';
+  const m = mein(g.id);
+  if (!m) return 'pool';
+  if (m.pausiert) return 'pausiert';
   const e = letzter(g.id);
   return e && tageSeit(e.datum) < RUHE_TAGE ? 'trainiert' : 'frei';
 }
@@ -251,13 +260,14 @@ async function start() {
   nav.classList.remove('hidden'); logoutBtn.classList.remove('hidden');
   setApp('<p class="muted">Lade …</p>');
   try {
-    const [g, e, k] = await Promise.all([
+    const [g, m, e, k] = await Promise.all([
       q(sb.from('geraete').select('*').order('name')),
+      q(sb.from('meine_geraete').select('*')),
       q(sb.from('trainings_eintraege').select('*').order('datum', { ascending: false }).order('erstellt_am', { ascending: false }).limit(2000)),
       q(sb.from('koerperwerte').select('*').order('datum', { ascending: false }).order('erstellt_am', { ascending: false }).limit(1000))
     ]);
-    S.geraete = g; S.eintraege = e; S.koerper = k; sortG();
-  } catch { setApp('<div class="card">Daten konnten nicht geladen werden. Ist <code>schema.sql</code> in Supabase ausgeführt?</div>'); return; }
+    S.geraete = g; S.meine = m; S.eintraege = e; S.koerper = k; sortG();
+  } catch { setApp('<div class="card">Daten konnten nicht geladen werden. Ist <code>update-gemeinsame-geraete.sql</code> (bzw. bei Neuinstallation <code>schema.sql</code>) in Supabase ausgeführt?</div>'); return; }
   render();
 }
 
@@ -268,16 +278,19 @@ function render() {
   ({ training: renderTraining, geraete: renderGeraete, koerper: renderKoerper })[S.tab]();
 }
 
-// ---------- Training ----------
+// ---------- Training (nur meine Favoriten) ----------
 function renderTraining() {
-  if (!S.geraete.length) {
-    setApp(`<div class="card empty"><p>Noch keine Geräte angelegt.</p><button class="primary" id="ersteG">Erstes Gerät anlegen</button></div>`);
-    $('#ersteG').onclick = () => geraetForm(); return;
+  const favs = S.geraete.filter(g => mein(g.id));
+  if (!favs.length) {
+    setApp(`<div class="card empty"><p>Du hast noch keine Geräte in deinem Training.</p>
+      <p class="muted small">Im Tab <b>Geräte</b> findest du den gemeinsamen Pool. Tippe dort auf ☆, um ein Gerät als Favorit in dein Training zu holen.</p>
+      <button class="primary" id="zumPool">Zum Gerätepool</button></div>`);
+    $('#zumPool').onclick = () => { S.tab = 'geraete'; render(); }; return;
   }
   const gruppen = { frei: [], trainiert: [], pausiert: [] };
-  S.geraete.forEach(g => gruppen[status(g)].push(g));
+  favs.forEach(g => gruppen[status(g)].push(g));
   const karte = g => {
-    const e = letzter(g.id), st = status(g);
+    const e = letzter(g.id), st = status(g), m = mein(g.id);
     if (st === 'pausiert') return `<div class="card geraet pausiert" data-id="${g.id}"><div class="row">
       <div><div class="title">${esc(g.name)}</div><div class="muted small">pausiert – derzeit nicht genutzt</div></div>
       <button class="ghost small" data-act="pause">▶ Wieder nutzen</button></div></div>`;
@@ -285,6 +298,7 @@ function renderTraining() {
       <div class="row"><div><div class="title">${esc(g.name)}</div>
         <div class="muted small">${[g.kategorie ? esc(g.kategorie) : '', e ? `zuletzt ${wannText(tageSeit(e.datum))}` : ''].filter(Boolean).join(' · ')}</div></div>
       <button class="primary" data-act="log">Eintragen</button></div>
+      ${m.notiz ? `<div class="muted small" style="margin-top:4px">⚙ ${esc(m.notiz)}</div>` : ''}
       ${e ? `<div class="last">${letzteTabelle(e)}</div>` : '<div class="last muted">Noch kein Eintrag</div>'}
       ${e?.ziel_naechstes_mal ? `<div class="ziel">🎯 ${esc(e.ziel_naechstes_mal)}</div>` : ''}
       ${e?.notiz ? `<div class="muted small" style="margin-top:4px">${esc(e.notiz)}</div>` : ''}
@@ -301,26 +315,29 @@ function renderTraining() {
     el.querySelector('[data-act=log]')?.addEventListener('click', () => logForm(g));
     el.querySelector('[data-act=verlauf]')?.addEventListener('click', () => verlauf(g));
     el.querySelector('[data-act=pause]').onclick = async () => {
-      const upd = await q(sb.from('geraete').update({ aktiv: !g.aktiv }).eq('id', g.id).select().single());
-      Object.assign(g, upd); toast(g.aktiv ? 'Wieder aktiv' : 'Pausiert'); render();
+      const m = mein(g.id);
+      const upd = await q(sb.from('meine_geraete').update({ pausiert: !m.pausiert }).eq('user_id', S.user.id).eq('geraet_id', g.id).select().single());
+      Object.assign(m, upd); toast(m.pausiert ? 'Pausiert' : 'Wieder aktiv'); render();
     };
   });
 }
 
 function logForm(g) {
-  const e = letzter(g.id);
+  const e = letzter(g.id), m = mein(g.id);
+  const pauseStd = m?.pause_sek ?? 90;
   const alteWdh = e?.wiederholungen || [];
   const startGew = e ? gewichteVon(e) : [];
-  let anz = e ? Math.max(alteWdh.length, 1) : g.saetze_ziel;
+  let anz = e ? Math.max(alteWdh.length, 1) : (m?.saetze ?? 3);
   oeffneDlg(`<form id="logF" class="form">
     <h2>${esc(g.name)}</h2>
     ${e ? `<div class="hint"><b>Letztes Mal (${wannText(tageSeit(e.datum))}, ${fmtDatum(e.datum)}):</b>${letzteTabelle(e)}</div>` : '<div class="hint">Erstes Training an diesem Gerät</div>'}
     ${e?.ziel_naechstes_mal ? `<div class="ziel">🎯 Dein Ziel: ${esc(e.ziel_naechstes_mal)}</div>` : ''}
+    ${m?.notiz ? `<div class="muted small" style="margin-top:6px">⚙ ${esc(m.notiz)}</div>` : ''}
     <label>Datum<input type="date" name="datum" value="${heute()}" required></label>
     <div class="row"><span>Sätze</span><div class="stepper"><button type="button" data-d="-1">−</button><b id="satzAnz">${anz}</b><button type="button" data-d="1">+</button></div></div>
     <div id="repsBox"></div>
     <div class="grid2">
-      <label>Pause (Sek.)<input name="pause" type="number" inputmode="numeric" min="0" value="${e?.pause_sek ?? g.pause_sek}"></label>
+      <label>Pause (Sek.)<input name="pause" type="number" inputmode="numeric" min="0" value="${e?.pause_sek ?? pauseStd}"></label>
       <div class="timer"><button type="button" id="timerBtn" class="ghost">Pause starten</button></div>
     </div>
     <label>Ziel fürs nächste Mal<input name="ziel" placeholder="z. B. alle 3 Sätze 8 Wdh."></label>
@@ -346,7 +363,7 @@ function logForm(g) {
   const tb = $('#timerBtn');
   tb.onclick = () => {
     if (timerId) { stopTimer(); tb.classList.remove('running'); tb.textContent = 'Pause starten'; return; }
-    startTimer(tb, num($('#logF').pause.value) || g.pause_sek);
+    startTimer(tb, num($('#logF').pause.value) || pauseStd);
   };
   $('#logF').onsubmit = async ev => {
     ev.preventDefault(); const f = ev.target;
@@ -388,53 +405,107 @@ function verlauf(g) {
   });
 }
 
-// ---------- Geräte ----------
+// ---------- Gerätepool (für alle) ----------
+async function favoritAn(g, werte = {}) {
+  const row = await q(sb.from('meine_geraete').upsert({ user_id: S.user.id, geraet_id: g.id, saetze: 3, pause_sek: 90, ...werte }).select().single());
+  S.meine = S.meine.filter(m => m.geraet_id !== g.id); S.meine.push(row);
+}
+async function favoritAus(g) {
+  await q(sb.from('meine_geraete').delete().eq('user_id', S.user.id).eq('geraet_id', g.id));
+  S.meine = S.meine.filter(m => m.geraet_id !== g.id);
+}
+
 function renderGeraete() {
-  setApp(`<button class="primary block" id="neuG">+ Gerät anlegen</button>
-    ${S.geraete.map(g => `<div class="card item" data-id="${g.id}"><div>
-      <div class="title">${esc(g.name)}${g.aktiv ? '' : ' <span class="badge">pausiert</span>'}</div>
-      <div class="muted small">${g.saetze_ziel} Sätze · ${g.pause_sek}s Pause${g.kategorie ? ' · ' + esc(g.kategorie) : ''}</div>
-      ${g.notiz ? `<div class="muted small">${esc(g.notiz)}</div>` : ''}</div>
-      <button class="ghost small">Bearbeiten</button></div>`).join('')}`);
+  setApp(`<div class="row" style="gap:8px">
+      <input id="suche" type="search" placeholder="Gerät suchen …" value="${esc(S.suche)}" autocomplete="off" style="margin:0">
+      <button class="primary" id="neuG" style="white-space:nowrap">+ Neu</button></div>
+    <p class="muted small" style="margin:8px 2px 0">Gemeinsamer Pool aller Nutzer. ★ = in deinem Training.</p>
+    <div id="poolListe"></div>`);
   $('#neuG').onclick = () => geraetForm();
-  app.querySelectorAll('.item').forEach(el => el.querySelector('button').onclick = () => geraetForm(S.geraete.find(x => x.id === el.dataset.id)));
+  $('#suche').oninput = ev => { S.suche = ev.target.value; zeichnePool(); };
+  zeichnePool();
+}
+
+function zeichnePool() {
+  const box = $('#poolListe'); if (!box) return;
+  const such = S.suche.trim().toLowerCase();
+  const treffer = S.geraete.filter(g => !such || g.name.toLowerCase().includes(such) || (g.kategorie || '').toLowerCase().includes(such));
+  const favs = treffer.filter(g => mein(g.id)), rest = treffer.filter(g => !mein(g.id));
+  const zeile = g => {
+    const m = mein(g.id);
+    const info = [g.kategorie ? esc(g.kategorie) : '', vonMir(g) ? 'von dir angelegt' : '', m?.pausiert ? 'pausiert' : ''].filter(Boolean).join(' · ');
+    return `<div class="card item pool" data-id="${g.id}">
+      <button class="star ${m ? 'an' : ''}" data-act="star" aria-label="${m ? 'Aus meinem Training entfernen' : 'In mein Training übernehmen'}">${m ? '★' : '☆'}</button>
+      <div style="flex:1;min-width:0"><div class="title">${esc(g.name)}</div>${info ? `<div class="muted small">${info}</div>` : ''}</div>
+      <button class="ghost small" data-act="edit">Details</button></div>`;
+  };
+  box.innerHTML = (!treffer.length ? `<div class="card empty muted">${such ? 'Kein Gerät gefunden.' : 'Der Pool ist noch leer.'}</div>` : '')
+    + (favs.length ? `<div class="gruppe">Mein Training (${favs.length})</div>` + favs.map(zeile).join('') : '')
+    + (rest.length ? `<div class="gruppe">Weitere Geräte im Pool (${rest.length})</div>` + rest.map(zeile).join('') : '');
+  box.querySelectorAll('.pool').forEach(el => {
+    const g = S.geraete.find(x => x.id === el.dataset.id);
+    el.querySelector('[data-act=star]').onclick = async () => {
+      if (mein(g.id)) { await favoritAus(g); toast('Aus deinem Training entfernt'); }
+      else { await favoritAn(g); toast('★ In dein Training übernommen'); }
+      zeichnePool();
+    };
+    el.querySelector('[data-act=edit]').onclick = () => geraetForm(g);
+  });
 }
 
 function geraetForm(g) {
-  const d = g || { name: '', kategorie: '', saetze_ziel: 3, wdh_min: 8, wdh_max: 8, steigerung_kg: 2.5, pause_sek: 90, notiz: '', aktiv: true };
+  const neu = !g, darfPool = neu || vonMir(g), m = g ? mein(g.id) : null;
+  const d = g || { name: '', kategorie: '' };
+  const pers = m || { saetze: 3, pause_sek: 90, notiz: '', pausiert: false };
+  const zeigePers = neu || !!m;
   oeffneDlg(`<form id="gF" class="form">
-    <h2>${g ? 'Gerät bearbeiten' : 'Neues Gerät'}</h2>
-    <label>Name<input name="name" value="${esc(d.name)}" placeholder="z. B. Brustpresse" required></label>
-    <label>Muskelgruppe<input name="kategorie" list="katList" value="${esc(d.kategorie)}" placeholder="optional"></label>
+    <h2>${neu ? 'Neues Gerät im Pool' : esc(g.name)}</h2>
+    <div class="abschnitt">Gerät (für alle sichtbar)</div>
+    <label>Name<input name="name" value="${esc(d.name)}" placeholder="z. B. Brustpresse" required ${darfPool ? '' : 'disabled'}></label>
+    <label>Muskelgruppe<input name="kategorie" list="katList" value="${esc(d.kategorie)}" placeholder="optional" ${darfPool ? '' : 'disabled'}></label>
     <datalist id="katList">${KATEGORIEN.map(k => `<option value="${k}">`).join('')}</datalist>
+    ${darfPool ? '' : '<p class="muted small" style="margin:6px 0 0">Von jemand anderem angelegt – Name und Muskelgruppe kann nur der Ersteller ändern.</p>'}
+    ${zeigePers ? `<div class="abschnitt">Meine Einstellungen (nur für dich)</div>
     <div class="grid2">
-      <label>Sätze (beim 1. Mal)<input name="saetze" type="number" inputmode="numeric" min="1" max="10" value="${d.saetze_ziel}" required></label>
-      <label>Pause (Sek.)<input name="pause" type="number" inputmode="numeric" min="0" value="${d.pause_sek}" required></label>
+      <label>Sätze (beim 1. Mal)<input name="saetze" type="number" inputmode="numeric" min="1" max="10" value="${pers.saetze}" required></label>
+      <label>Pause (Sek.)<input name="pause" type="number" inputmode="numeric" min="0" value="${pers.pause_sek}" required></label>
     </div>
-    <label>Notiz / Einstellung<input name="notiz" value="${esc(d.notiz)}" placeholder="z. B. Sitz Stufe 4, Lehne 2"></label>
-    ${g ? `<label class="check"><input type="checkbox" name="pausiert" ${d.aktiv ? '' : 'checked'}> Pausiert (derzeit nicht genutzt)</label>` : ''}
-    <div class="actions">${g ? '<button type="button" class="ghost danger" id="delG">Löschen</button><span class="spacer"></span>' : ''}
-      <button type="button" class="ghost" data-close>Abbrechen</button><button class="primary" type="submit">Speichern</button></div>
+    <label>Meine Einstellung am Gerät<input name="notiz" value="${esc(pers.notiz)}" placeholder="z. B. Sitz Stufe 4, Lehne 2"></label>
+    ${neu ? '' : `<label class="check"><input type="checkbox" name="pausiert" ${pers.pausiert ? 'checked' : ''}> Pausiert (derzeit nicht genutzt)</label>`}`
+    : `<div class="abschnitt">Mein Training</div><button type="button" class="ghost block" id="favAn">☆ In mein Training übernehmen</button>`}
+    <div class="actions">${!neu && darfPool ? '<button type="button" class="ghost danger" id="delG">Löschen</button><span class="spacer"></span>' : ''}
+      <button type="button" class="ghost" data-close>Abbrechen</button>${darfPool || zeigePers ? '<button class="primary" type="submit">Speichern</button>' : ''}</div>
   </form>`);
+  const persWerte = f => ({ saetze: +f.saetze.value, pause_sek: +f.pause.value, notiz: f.notiz.value.trim() || null, ...(f.pausiert ? { pausiert: f.pausiert.checked } : {}) });
+  $('#favAn')?.addEventListener('click', async () => { await favoritAn(g); toast('★ In dein Training übernommen'); geraetForm(g); render(); });
   $('#gF').onsubmit = async ev => {
     ev.preventDefault(); const f = ev.target;
-    const row = { name: f.name.value.trim(), kategorie: f.kategorie.value.trim() || null, saetze_ziel: +f.saetze.value, pause_sek: +f.pause.value, notiz: f.notiz.value.trim() || null };
-    if (g) row.aktiv = !f.pausiert.checked;
-    if (g) {
-      const upd = await q(sb.from('geraete').update(row).eq('id', g.id).select().single());
-      Object.assign(g, upd);
+    const pool = { name: f.name.value.trim(), kategorie: f.kategorie.value.trim() || null };
+    if (neu) {
+      const gleich = S.geraete.find(x => x.name.trim().toLowerCase() === pool.name.toLowerCase());
+      if (gleich) {
+        if (!confirm(`„${gleich.name}“ gibt es schon im Pool. Stattdessen dieses Gerät in dein Training übernehmen?`)) return;
+        await favoritAn(gleich, persWerte(f)); dlg.close(); toast('★ In dein Training übernommen'); render(); return;
+      }
+      const ng = await q(sb.from('geraete').insert(pool).select().single());
+      S.geraete.push(ng); await favoritAn(ng, persWerte(f));
     } else {
-      S.geraete.push(await q(sb.from('geraete').insert(row).select().single()));
+      if (darfPool && (pool.name !== g.name || pool.kategorie !== (g.kategorie || null)))
+        Object.assign(g, await q(sb.from('geraete').update(pool).eq('id', g.id).select().single()));
+      if (m) Object.assign(m, await q(sb.from('meine_geraete').update(persWerte(f)).eq('user_id', S.user.id).eq('geraet_id', g.id).select().single()));
     }
     sortG(); dlg.close(); toast('Gespeichert'); render();
   };
-  if (g) $('#delG').onclick = async () => {
+  $('#delG')?.addEventListener('click', async () => {
     const n = eintraegeVon(g.id).length;
-    if (!confirm(`„${g.name}“ löschen?${n ? ` Dabei werden auch ${n} Trainingseinträge gelöscht. Tipp: Stattdessen „Pausiert“ anhaken.` : ''}`)) return;
-    await q(sb.from('geraete').delete().eq('id', g.id));
-    S.geraete = S.geraete.filter(x => x.id !== g.id); S.eintraege = S.eintraege.filter(x => x.geraet_id !== g.id);
-    dlg.close(); render();
-  };
+    if (!confirm(`„${g.name}“ aus dem Pool löschen?${n ? ` Dabei werden auch deine ${n} Trainingseinträge gelöscht.` : ''}\n\nTipp: Wenn du es nur nicht mehr nutzt, entferne stattdessen den ★ oder pausiere es.`)) return;
+    const res = await sb.from('geraete').delete().eq('id', g.id).select();
+    if (res.error) return toast(res.error.message, true);
+    if (!res.data?.length) return toast('Kann nicht gelöscht werden – das Gerät wird von anderen Nutzern verwendet.', true);
+    S.geraete = S.geraete.filter(x => x.id !== g.id); S.meine = S.meine.filter(x => x.geraet_id !== g.id);
+    S.eintraege = S.eintraege.filter(x => x.geraet_id !== g.id);
+    dlg.close(); toast('Gelöscht'); render();
+  });
 }
 
 // ---------- Körper ----------

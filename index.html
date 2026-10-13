@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#1f6f5c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
-:root{--bg:#f6f5f2;--card:#fff;--text:#1d1d1b;--muted:#6b6a66;--line:#e3e1db;--accent:#1f6f5c;--accent-ink:#fff;--warn:#b5651d;--good:#2e7d32;--c3:#5a6fb0;--c4:#a04a7a;--soft:#eef4f1;--r:14px}
-@media (prefers-color-scheme: dark){:root{--bg:#141413;--card:#1e1e1c;--text:#ecebe6;--muted:#9c9a93;--line:#2f2e2b;--accent:#4fb39a;--accent-ink:#0d1f1a;--warn:#e0a060;--good:#7cc47f;--c3:#8fa3e6;--c4:#d98bb8;--soft:#1f2a26}}
+:root{--bg:#f6f5f2;--card:#fff;--text:#1d1d1b;--muted:#6b6a66;--line:#e3e1db;--accent:#1f6f5c;--accent-ink:#fff;--warn:#b5651d;--good:#2e7d32;--c3:#5a6fb0;--c4:#a04a7a;--soft:#eef4f1;--rot:#c0392b;--rot-bg:#fdf0ee;--r:14px}
+@media (prefers-color-scheme: dark){:root{--bg:#141413;--card:#1e1e1c;--text:#ecebe6;--muted:#9c9a93;--line:#2f2e2b;--accent:#4fb39a;--accent-ink:#0d1f1a;--warn:#e0a060;--good:#7cc47f;--c3:#8fa3e6;--c4:#d98bb8;--soft:#1f2a26;--rot:#f08070;--rot-bg:#2e1c1a}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
 header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(12px + env(safe-area-inset-top)) 16px 8px;display:flex;justify-content:space-between;align-items:center;max-width:640px;margin:0 auto}
@@ -46,8 +46,17 @@ input:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .reps{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px}
-.satz{display:grid;grid-template-columns:62px 1fr 1fr;gap:10px;align-items:end}
+.satz{display:grid;grid-template-columns:62px 1fr 1fr;gap:4px 10px;align-items:end;margin-top:4px}
 .satz .nr{padding-bottom:13px;font-weight:600;font-size:14px}
+.satz .zuvor{grid-column:2/4;font-size:12px;color:var(--muted)}
+table.saetze{border-collapse:collapse;margin-top:6px;font-size:15px;font-variant-numeric:tabular-nums}
+table.saetze th{font-size:12px;font-weight:500;color:var(--muted);text-align:right;padding:0 0 2px 18px}
+table.saetze td{padding:2px 0 2px 18px;text-align:right;font-weight:600}
+table.saetze td:first-child,table.saetze th:first-child{padding-left:0;text-align:left;font-weight:400;color:var(--muted)}
+.geraet.trainiert{border-color:var(--rot);background:var(--rot-bg)}
+.geraet.trainiert .title{color:var(--rot)}
+.geraet.pausiert{opacity:.55;padding:10px 14px}
+.gruppe{margin:22px 2px 4px;font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .stepper{display:flex;align-items:center;gap:14px}
 .stepper button{width:40px;height:40px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:20px}
 .form .row{margin-top:12px}
@@ -141,27 +150,26 @@ function gewichteVon(e) {
 const saetzeText = e => { const w = gewichteVon(e); return e.wiederholungen.map((r, i) => `${fmt(w[i])}×${r}`).join(' · '); };
 const volumen = e => { const w = gewichteVon(e); return summe(e.wiederholungen.map((r, i) => r * w[i])); };
 
-// ---------- Steigerungslogik: Satz für Satz ----------
-// Alle Sätze mit Ziel-Wdh. geschafft → nächster Satz bekommt das höhere Gewicht.
-// Sind alle Sätze auf dem gleichen Gewicht, wird Satz 1 um die Steigerung erhöht.
-function vorschlag(g, e) {
-  const ziel = g.wdh_max, stg = Number(g.steigerung_kg), n = g.saetze_ziel;
-  if (!e) return { typ: 'neu', gewichte: null, text: `Startgewicht wählen: ${n} Sätze à ${ziel} Wdh.` };
-  const r = e.wiederholungen || [], w = gewichteVon(e);
-  const ws = Array.from({ length: n }, (_, i) => w[i] ?? w[w.length - 1]);
-  const geschafft = r.length >= n && r.slice(0, n).every(x => x >= ziel);
-  if (!geschafft) {
-    const offen = r.slice(0, n).map((x, i) => x < ziel ? i + 1 : null).filter(Boolean);
-    const text = r.length < n
-      ? `Gleiche Gewichte – Ziel: ${n} Sätze à ${ziel} Wdh.`
-      : `Gleiche Gewichte wiederholen – Satz ${offen.join(', ')} noch unter ${ziel} Wdh.`;
-    return { typ: 'halten', gewichte: ws, text };
-  }
-  const m = Math.max(...ws), i = ws.findIndex(x => x < m), neu = [...ws];
-  let text;
-  if (i === -1) { neu[0] = m + stg; text = `Geschafft! Satz 1 auf ${fmt(m + stg)} kg, die anderen bleiben bei ${fmt(m)} kg.`; }
-  else { neu[i] = m; text = `Geschafft! Jetzt auch Satz ${i + 1} auf ${fmt(m)} kg.`; }
-  return { typ: 'steigern', gewichte: neu, text };
+// Tabelle "Satz | kg | Wdh." für den letzten Eintrag
+function letzteTabelle(e) {
+  const w = gewichteVon(e);
+  return `<table class="saetze"><tr><th></th><th>kg</th><th>Wdh.</th></tr>${e.wiederholungen.map((r, i) =>
+    `<tr><td>Satz ${i + 1}</td><td>${fmt(w[i])}</td><td>${r}</td></tr>`).join('')}</table>`;
+}
+
+// ---------- Einfacher Trainingsplan ----------
+// Wurde ein Gerät vor weniger als RUHE_TAGE Tagen trainiert, ist es rot und rutscht nach unten.
+// Pausierte Geräte (aktiv = false) stehen ganz unten.
+const RUHE_TAGE = Number(cfg.ruheTage) || 2;
+function tageSeit(datum) {
+  const a = new Date(datum + 'T00:00:00'), b = new Date(heute() + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
+}
+const wannText = t => t <= 0 ? 'heute' : t === 1 ? 'gestern' : `vor ${t} Tagen`;
+function status(g) {
+  if (!g.aktiv) return 'pausiert';
+  const e = letzter(g.id);
+  return e && tageSeit(e.datum) < RUHE_TAGE ? 'trainiert' : 'frei';
 }
 
 // ---------- Pausen-Timer ----------
@@ -262,38 +270,51 @@ function render() {
 
 // ---------- Training ----------
 function renderTraining() {
-  const aktive = S.geraete.filter(g => g.aktiv);
-  if (!aktive.length) {
+  if (!S.geraete.length) {
     setApp(`<div class="card empty"><p>Noch keine Geräte angelegt.</p><button class="primary" id="ersteG">Erstes Gerät anlegen</button></div>`);
     $('#ersteG').onclick = () => geraetForm(); return;
   }
-  setApp(aktive.map(g => {
-    const e = letzter(g.id), v = vorschlag(g, e);
-    return `<div class="card geraet" data-id="${g.id}">
-      <div class="row"><div><div class="title">${esc(g.name)}</div>${g.kategorie ? `<div class="muted small">${esc(g.kategorie)}</div>` : ''}</div>
+  const gruppen = { frei: [], trainiert: [], pausiert: [] };
+  S.geraete.forEach(g => gruppen[status(g)].push(g));
+  const karte = g => {
+    const e = letzter(g.id), st = status(g);
+    if (st === 'pausiert') return `<div class="card geraet pausiert" data-id="${g.id}"><div class="row">
+      <div><div class="title">${esc(g.name)}</div><div class="muted small">pausiert – derzeit nicht genutzt</div></div>
+      <button class="ghost small" data-act="pause">▶ Wieder nutzen</button></div></div>`;
+    return `<div class="card geraet ${st}" data-id="${g.id}">
+      <div class="row"><div><div class="title">${esc(g.name)}</div>
+        <div class="muted small">${[g.kategorie ? esc(g.kategorie) : '', e ? `zuletzt ${wannText(tageSeit(e.datum))}` : ''].filter(Boolean).join(' · ')}</div></div>
       <button class="primary" data-act="log">Eintragen</button></div>
-      <div class="last">${e ? `Zuletzt ${fmtDatum(e.datum)}: <b>${saetzeText(e)}</b> <span class="muted small">(kg×Wdh.)</span>` : '<span class="muted">Noch kein Eintrag</span>'}</div>
-      ${v.gewichte ? `<div class="small">Nächstes Mal: <b>${v.gewichte.map(fmt).join(' · ')} kg</b></div>` : ''}
+      ${e ? `<div class="last">${letzteTabelle(e)}</div>` : '<div class="last muted">Noch kein Eintrag</div>'}
       ${e?.ziel_naechstes_mal ? `<div class="ziel">🎯 ${esc(e.ziel_naechstes_mal)}</div>` : ''}
-      <div class="hint ${v.typ}">${esc(v.text)}</div>
-      ${e ? '<button class="link" data-act="verlauf">Verlauf ansehen</button>' : ''}
+      ${e?.notiz ? `<div class="muted small" style="margin-top:4px">${esc(e.notiz)}</div>` : ''}
+      <div class="row" style="margin-top:4px">${e ? '<button class="link" data-act="verlauf">Verlauf</button>' : '<span></span>'}
+        <button class="link muted" data-act="pause">Pausieren</button></div>
     </div>`;
-  }).join(''));
+  };
+  const titel = (t, n) => n ? `<div class="gruppe">${t}</div>` : '';
+  setApp(gruppen.frei.map(karte).join('')
+    + titel(`Kürzlich trainiert (letzte ${RUHE_TAGE} Tage)`, gruppen.trainiert.length) + gruppen.trainiert.map(karte).join('')
+    + titel('Pausiert', gruppen.pausiert.length) + gruppen.pausiert.map(karte).join(''));
   app.querySelectorAll('.geraet').forEach(el => {
     const g = S.geraete.find(x => x.id === el.dataset.id);
-    el.querySelector('[data-act=log]').onclick = () => logForm(g);
-    const vb = el.querySelector('[data-act=verlauf]'); if (vb) vb.onclick = () => verlauf(g);
+    el.querySelector('[data-act=log]')?.addEventListener('click', () => logForm(g));
+    el.querySelector('[data-act=verlauf]')?.addEventListener('click', () => verlauf(g));
+    el.querySelector('[data-act=pause]').onclick = async () => {
+      const upd = await q(sb.from('geraete').update({ aktiv: !g.aktiv }).eq('id', g.id).select().single());
+      Object.assign(g, upd); toast(g.aktiv ? 'Wieder aktiv' : 'Pausiert'); render();
+    };
   });
 }
 
 function logForm(g) {
-  const e = letzter(g.id), v = vorschlag(g, e);
+  const e = letzter(g.id);
   const alteWdh = e?.wiederholungen || [];
-  const startGew = v.gewichte || [];
-  let anz = g.saetze_ziel;
+  const startGew = e ? gewichteVon(e) : [];
+  let anz = e ? Math.max(alteWdh.length, 1) : g.saetze_ziel;
   oeffneDlg(`<form id="logF" class="form">
     <h2>${esc(g.name)}</h2>
-    <div class="hint ${v.typ}">${esc(v.text)}</div>
+    ${e ? `<div class="hint"><b>Letztes Mal (${wannText(tageSeit(e.datum))}, ${fmtDatum(e.datum)}):</b>${letzteTabelle(e)}</div>` : '<div class="hint">Erstes Training an diesem Gerät</div>'}
     ${e?.ziel_naechstes_mal ? `<div class="ziel">🎯 Dein Ziel: ${esc(e.ziel_naechstes_mal)}</div>` : ''}
     <label>Datum<input type="date" name="datum" value="${heute()}" required></label>
     <div class="row"><span>Sätze</span><div class="stepper"><button type="button" data-d="-1">−</button><b id="satzAnz">${anz}</b><button type="button" data-d="1">+</button></div></div>
@@ -312,9 +333,11 @@ function logForm(g) {
     const altW = [...box.querySelectorAll('[data-wdh]')].map(i => i.value);
     box.innerHTML = Array.from({ length: anz }, (_, i) => {
       const kg = altKg[i] ?? (startGew[i] != null ? fmt(startGew[i]) : (altKg[i - 1] ?? (startGew.length ? fmt(startGew[startGew.length - 1]) : '')));
+      const zuvor = alteWdh[i] != null ? `zuvor ${fmt(startGew[i])} kg × ${alteWdh[i]}` : '';
       return `<div class="satz"><span class="nr">Satz ${i + 1}</span>
         <label>kg<input data-kg inputmode="decimal" value="${kg}" required></label>
-        <label>Wdh.<input data-wdh type="number" inputmode="numeric" min="0" max="999" value="${altW[i] ?? ''}" placeholder="${alteWdh[i] ?? g.wdh_max}" required></label></div>`;
+        <label>Wdh.<input data-wdh type="number" inputmode="numeric" min="0" max="999" value="${altW[i] ?? ''}" placeholder="${alteWdh[i] ?? ''}" required></label>
+        ${zuvor ? `<span class="zuvor">${zuvor}</span>` : ''}</div>`;
     }).join('');
     $('#satzAnz').textContent = anz;
   };
@@ -332,7 +355,12 @@ function logForm(g) {
     if (wdh.some(isNaN)) return toast('Bitte bei allen Sätzen die Wiederholungen eintragen', true);
     if (kgs.some(x => x == null || isNaN(x))) return toast('Bitte bei allen Sätzen ein gültiges Gewicht eintragen', true);
     const row = { geraet_id: g.id, datum: f.datum.value, gewicht_kg: Math.max(...kgs), gewichte: kgs, wiederholungen: wdh, pause_sek: num(f.pause.value), ziel_naechstes_mal: f.ziel.value.trim() || null, notiz: f.notiz.value.trim() || null };
-    const neu = await q(sb.from('trainings_eintraege').insert(row).select().single());
+    const res = await sb.from('trainings_eintraege').insert(row).select().single();
+    if (res.error) {
+      const fehltSpalte = /gewichte/i.test(res.error.message);
+      return toast(fehltSpalte ? 'Datenbank-Update fehlt: bitte update-gewichte-pro-satz.sql in Supabase ausführen' : res.error.message, true);
+    }
+    const neu = res.data;
     S.eintraege.unshift(neu); sortE(); dlg.close(); toast('Gespeichert 💪'); render();
   };
 }
@@ -365,7 +393,7 @@ function renderGeraete() {
   setApp(`<button class="primary block" id="neuG">+ Gerät anlegen</button>
     ${S.geraete.map(g => `<div class="card item" data-id="${g.id}"><div>
       <div class="title">${esc(g.name)}${g.aktiv ? '' : ' <span class="badge">pausiert</span>'}</div>
-      <div class="muted small">${g.saetze_ziel} × ${g.wdh_max} Wdh. · Steigerung ${fmt(g.steigerung_kg)} kg · ${g.pause_sek}s Pause${g.kategorie ? ' · ' + esc(g.kategorie) : ''}</div>
+      <div class="muted small">${g.saetze_ziel} Sätze · ${g.pause_sek}s Pause${g.kategorie ? ' · ' + esc(g.kategorie) : ''}</div>
       ${g.notiz ? `<div class="muted small">${esc(g.notiz)}</div>` : ''}</div>
       <button class="ghost small">Bearbeiten</button></div>`).join('')}`);
   $('#neuG').onclick = () => geraetForm();
@@ -380,22 +408,18 @@ function geraetForm(g) {
     <label>Muskelgruppe<input name="kategorie" list="katList" value="${esc(d.kategorie)}" placeholder="optional"></label>
     <datalist id="katList">${KATEGORIEN.map(k => `<option value="${k}">`).join('')}</datalist>
     <div class="grid2">
-      <label>Sätze<input name="saetze" type="number" inputmode="numeric" min="1" max="10" value="${d.saetze_ziel}" required></label>
-      <label>Wdh. pro Satz (Ziel)<input name="wziel" type="number" inputmode="numeric" min="1" value="${d.wdh_max}" required></label>
-      <label>Steigerung (kg)<input name="stg" inputmode="decimal" value="${fmt(d.steigerung_kg)}" required></label>
+      <label>Sätze (beim 1. Mal)<input name="saetze" type="number" inputmode="numeric" min="1" max="10" value="${d.saetze_ziel}" required></label>
       <label>Pause (Sek.)<input name="pause" type="number" inputmode="numeric" min="0" value="${d.pause_sek}" required></label>
     </div>
-    <p class="muted small" style="margin:6px 0 0">Steigerung = um so viel kg geht Satz für Satz hoch, sobald du alle Sätze mit der Ziel-Wdh. geschafft hast.</p>
     <label>Notiz / Einstellung<input name="notiz" value="${esc(d.notiz)}" placeholder="z. B. Sitz Stufe 4, Lehne 2"></label>
-    ${g ? `<label class="check"><input type="checkbox" name="aktiv" ${d.aktiv ? 'checked' : ''}> Im Training anzeigen</label>` : ''}
+    ${g ? `<label class="check"><input type="checkbox" name="pausiert" ${d.aktiv ? '' : 'checked'}> Pausiert (derzeit nicht genutzt)</label>` : ''}
     <div class="actions">${g ? '<button type="button" class="ghost danger" id="delG">Löschen</button><span class="spacer"></span>' : ''}
       <button type="button" class="ghost" data-close>Abbrechen</button><button class="primary" type="submit">Speichern</button></div>
   </form>`);
   $('#gF').onsubmit = async ev => {
     ev.preventDefault(); const f = ev.target;
-    const row = { name: f.name.value.trim(), kategorie: f.kategorie.value.trim() || null, saetze_ziel: +f.saetze.value, wdh_min: +f.wziel.value, wdh_max: +f.wziel.value, steigerung_kg: num(f.stg.value), pause_sek: +f.pause.value, notiz: f.notiz.value.trim() || null };
-    if (g) row.aktiv = f.aktiv.checked;
-    if (row.steigerung_kg == null || isNaN(row.steigerung_kg)) return toast('Bitte gültige Steigerung eingeben', true);
+    const row = { name: f.name.value.trim(), kategorie: f.kategorie.value.trim() || null, saetze_ziel: +f.saetze.value, pause_sek: +f.pause.value, notiz: f.notiz.value.trim() || null };
+    if (g) row.aktiv = !f.pausiert.checked;
     if (g) {
       const upd = await q(sb.from('geraete').update(row).eq('id', g.id).select().single());
       Object.assign(g, upd);
@@ -406,7 +430,7 @@ function geraetForm(g) {
   };
   if (g) $('#delG').onclick = async () => {
     const n = eintraegeVon(g.id).length;
-    if (!confirm(`„${g.name}“ löschen?${n ? ` Dabei werden auch ${n} Trainingseinträge gelöscht. Tipp: Stattdessen „Im Training anzeigen“ abhaken.` : ''}`)) return;
+    if (!confirm(`„${g.name}“ löschen?${n ? ` Dabei werden auch ${n} Trainingseinträge gelöscht. Tipp: Stattdessen „Pausiert“ anhaken.` : ''}`)) return;
     await q(sb.from('geraete').delete().eq('id', g.id));
     S.geraete = S.geraete.filter(x => x.id !== g.id); S.eintraege = S.eintraege.filter(x => x.geraet_id !== g.id);
     dlg.close(); render();
@@ -501,7 +525,6 @@ function linienChart(canvas, labels, datasets) {
   });
 }
 
-window.__kraftbuchTest = { vorschlag };
 })();
 </script>
 </body>

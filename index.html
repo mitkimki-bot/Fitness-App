@@ -61,6 +61,13 @@ table.saetze td:first-child,table.saetze th:first-child{padding-left:0;text-alig
 .star.an{color:#e0a800}
 .abschnitt{margin:18px 0 0;font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em}
 input:disabled{opacity:.6}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;vertical-align:2px;letter-spacing:.02em;color:#fff}
+.chip.push{background:#c2410c}.chip.pull{background:#1d4ed8}.chip.beine{background:#15803d}.chip.rumpf{background:#6b7280}
+.plan{padding:12px 14px}
+.umschalter{display:flex;align-items:center;gap:6px;margin-top:10px}
+.umschalter button{border:1px solid var(--line);background:var(--bg);color:var(--text);padding:5px 10px;font-size:13px}
+.umschalter button.an{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+select{display:block;width:100%;margin-top:4px;padding:11px 12px;font:inherit;font-size:16px;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px}
 .gruppe{margin:22px 2px 4px;font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .stepper{display:flex;align-items:center;gap:14px}
 .stepper button{width:40px;height:40px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:20px}
@@ -167,18 +174,65 @@ function letzteTabelle(e) {
 // ---------- Einfacher Trainingsplan ----------
 // Wurde ein Gerät vor weniger als RUHE_TAGE Tagen trainiert, ist es rot und rutscht nach unten.
 // Pausierte Geräte (aktiv = false) stehen ganz unten.
-const RUHE_TAGE = Number(cfg.ruheTage) || 2;
+const RUHE_TAGE = Number(cfg.ruheTage) || 3;
 function tageSeit(datum) {
   const a = new Date(datum + 'T00:00:00'), b = new Date(heute() + 'T00:00:00');
   return Math.round((b - a) / 86400000);
 }
 const wannText = t => t <= 0 ? 'heute' : t === 1 ? 'gestern' : `vor ${t} Tagen`;
+// ---------- Push / Pull / Beine / Rumpf ----------
+const GRUPPEN = { push: 'Push', pull: 'Pull', beine: 'Beine', rumpf: 'Rumpf' };
+const PLAN_GRUPPEN = ['push', 'pull', 'beine'];        // Rumpf läuft nebenher, kein eigener Tag
+// Vorschlag aus dem Gerätenamen. Reihenfolge wichtig: "Rückenstrecker" vor "Rücken", "Beincurl" vor "Curl" usw.
+const NAMENSREGELN = [
+  [/bauch|abdom|crunch|sit.?up|rückenstreck|rueckenstreck|hyperext|lower.?back|rumpf|core|rotation|torso|plank/, 'rumpf', 'Bauch'],
+  [/bein|leg|squat|kniebeug|hack|wade|calf|waden|abdukt|addukt|gesäß|gesaess|glute|hip.?thrust|po.?maschine/, 'beine', 'Beine'],
+  [/reverse|rear.?delt|hintere.?schulter|face.?pull/, 'pull', 'Schultern'],
+  [/trizeps|triceps|dips|french|pushdown/, 'push', 'Arme'],
+  [/bizeps|biceps|curl|hammer/, 'pull', 'Arme'],
+  [/schulter|shoulder|seitheb|lateral|military|overhead|nacken/, 'push', 'Schultern'],
+  [/brust|chest|bank|bench|butterfly|fly|pec|liegestütz|push.?up|drück|druck|press/, 'push', 'Brust'],
+  [/lat|ruder|row|klimmzug|pull.?up|chin.?up|pulldown|zug|rücken|ruecken|back/, 'pull', 'Rücken'],
+];
+function ausName(name) {
+  const n = (name || '').toLowerCase();
+  for (const [re, gruppe, kategorie] of NAMENSREGELN) if (re.test(n)) return { gruppe, kategorie };
+  return { gruppe: null, kategorie: null };
+}
+// Meine Zuordnung > Pool-Zuordnung > Vorschlag aus dem Namen
+const gruppeVon = g => mein(g.id)?.gruppe || g.gruppe || ausName(g.name).gruppe;
+
+// Rot pro Gerät oder pro Gruppe (merkt sich das Handy)
+let rotModus = 'geraet';
+try { rotModus = localStorage.getItem('kraftbuch-rot') === 'gruppe' ? 'gruppe' : 'geraet'; } catch {}
+const setRotModus = v => { rotModus = v; try { localStorage.setItem('kraftbuch-rot', v); } catch {} };
+
+// Letztes Trainingsdatum einer Gruppe (über alle meine Favoriten dieser Gruppe)
+function letztesDatumGruppe(gr) {
+  let best = null;
+  for (const g of S.geraete) {
+    if (!mein(g.id) || gruppeVon(g) !== gr) continue;
+    const e = letzter(g.id);
+    if (e && (!best || e.datum > best)) best = e.datum;
+  }
+  return best;
+}
+// Welche Gruppe ist heute dran? Die, die am längsten nicht trainiert wurde (nur Gruppen mit aktiven Favoriten).
+function heuteDran() {
+  const liste = PLAN_GRUPPEN.filter(gr => S.geraete.some(g => mein(g.id) && !mein(g.id).pausiert && gruppeVon(g) === gr))
+    .map(gr => ({ gr, datum: letztesDatumGruppe(gr) }));
+  if (!liste.length) return { dran: null, liste };
+  const sortiert = [...liste].sort((a, b) => (a.datum || '') < (b.datum || '') ? -1 : (a.datum || '') > (b.datum || '') ? 1 : 0);
+  return { dran: sortiert[0].gr, liste };
+}
+
 function status(g) {
   const m = mein(g.id);
   if (!m) return 'pool';
   if (m.pausiert) return 'pausiert';
-  const e = letzter(g.id);
-  return e && tageSeit(e.datum) < RUHE_TAGE ? 'trainiert' : 'frei';
+  const gr = gruppeVon(g);
+  const datum = rotModus === 'gruppe' && gr ? letztesDatumGruppe(gr) : letzter(g.id)?.datum;
+  return datum && tageSeit(datum) < RUHE_TAGE ? 'trainiert' : 'frei';
 }
 
 // ---------- Pausen-Timer ----------
@@ -289,13 +343,26 @@ function renderTraining() {
   }
   const gruppen = { frei: [], trainiert: [], pausiert: [] };
   favs.forEach(g => gruppen[status(g)].push(g));
+  const { dran, liste: planListe } = heuteDran();
+  // Geräte der Gruppe, die heute dran ist, nach oben
+  gruppen.frei.sort((a, b) => (gruppeVon(b) === dran) - (gruppeVon(a) === dran));
+  const chip = g => { const gr = gruppeVon(g); return gr ? `<span class="chip ${gr}">${GRUPPEN[gr]}</span>` : ''; };
+  const kopf = `<div class="card plan">
+      ${dran ? `<div>Heute dran: <span class="chip ${dran}">${GRUPPEN[dran]}</span>
+        <span class="muted small">${(() => { const d = planListe.find(x => x.gr === dran).datum; return d ? 'zuletzt ' + wannText(tageSeit(d)) : 'noch nie trainiert'; })()}</span></div>` : ''}
+      ${planListe.length ? `<div class="muted small" style="margin-top:4px">${planListe.map(x => `${GRUPPEN[x.gr]}: ${x.datum ? wannText(tageSeit(x.datum)) : 'nie'}`).join(' · ')}</div>` : '<div class="muted small">Ordne deinen Geräten Push, Pull oder Beine zu (Geräte → Details), dann schlägt die App vor, was heute dran ist.</div>'}
+      <div class="umschalter" role="group" aria-label="Roter Rahmen">
+        <span class="muted small">Rot:</span>
+        <button type="button" data-rot="geraet" class="${rotModus === 'geraet' ? 'an' : ''}">pro Gerät</button>
+        <button type="button" data-rot="gruppe" class="${rotModus === 'gruppe' ? 'an' : ''}">pro Gruppe</button>
+      </div></div>`;
   const karte = g => {
     const e = letzter(g.id), st = status(g), m = mein(g.id);
     if (st === 'pausiert') return `<div class="card geraet pausiert" data-id="${g.id}"><div class="row">
-      <div><div class="title">${esc(g.name)}</div><div class="muted small">pausiert – derzeit nicht genutzt</div></div>
+      <div><div class="title">${esc(g.name)} ${chip(g)}</div><div class="muted small">pausiert – derzeit nicht genutzt</div></div>
       <button class="ghost small" data-act="pause">▶ Wieder nutzen</button></div></div>`;
     return `<div class="card geraet ${st}" data-id="${g.id}">
-      <div class="row"><div><div class="title">${esc(g.name)}</div>
+      <div class="row"><div><div class="title">${esc(g.name)} ${chip(g)}</div>
         <div class="muted small">${[g.kategorie ? esc(g.kategorie) : '', e ? `zuletzt ${wannText(tageSeit(e.datum))}` : ''].filter(Boolean).join(' · ')}</div></div>
       <button class="primary" data-act="log">Eintragen</button></div>
       ${m.notiz ? `<div class="muted small" style="margin-top:4px">⚙ ${esc(m.notiz)}</div>` : ''}
@@ -307,9 +374,10 @@ function renderTraining() {
     </div>`;
   };
   const titel = (t, n) => n ? `<div class="gruppe">${t}</div>` : '';
-  setApp(gruppen.frei.map(karte).join('')
-    + titel(`Kürzlich trainiert (letzte ${RUHE_TAGE} Tage)`, gruppen.trainiert.length) + gruppen.trainiert.map(karte).join('')
+  setApp(kopf + gruppen.frei.map(karte).join('')
+    + titel(`Kürzlich trainiert (letzte ${RUHE_TAGE} Tage${rotModus === 'gruppe' ? ', ganze Gruppe' : ''})`, gruppen.trainiert.length) + gruppen.trainiert.map(karte).join('')
     + titel('Pausiert', gruppen.pausiert.length) + gruppen.pausiert.map(karte).join(''));
+  app.querySelectorAll('[data-rot]').forEach(b => b.onclick = () => { setRotModus(b.dataset.rot); render(); });
   app.querySelectorAll('.geraet').forEach(el => {
     const g = S.geraete.find(x => x.id === el.dataset.id);
     el.querySelector('[data-act=log]')?.addEventListener('click', () => logForm(g));
@@ -433,7 +501,8 @@ function zeichnePool() {
   const favs = treffer.filter(g => mein(g.id)), rest = treffer.filter(g => !mein(g.id));
   const zeile = g => {
     const m = mein(g.id);
-    const info = [g.kategorie ? esc(g.kategorie) : '', vonMir(g) ? 'von dir angelegt' : '', m?.pausiert ? 'pausiert' : ''].filter(Boolean).join(' · ');
+    const gr = gruppeVon(g);
+    const info = [gr ? GRUPPEN[gr] : '', g.kategorie && g.kategorie !== GRUPPEN[gr] ? esc(g.kategorie) : '', vonMir(g) ? 'von dir angelegt' : '', m?.pausiert ? 'pausiert' : ''].filter(Boolean).join(' · ');
     return `<div class="card item pool" data-id="${g.id}">
       <button class="star ${m ? 'an' : ''}" data-act="star" aria-label="${m ? 'Aus meinem Training entfernen' : 'In mein Training übernehmen'}">${m ? '★' : '☆'}</button>
       <div style="flex:1;min-width:0"><div class="title">${esc(g.name)}</div>${info ? `<div class="muted small">${info}</div>` : ''}</div>
@@ -453,6 +522,10 @@ function zeichnePool() {
   });
 }
 
+function gruppeSelect(name, wert, aus, leerText = '– keine –') {
+  return `<select name="${name}" ${aus ? 'disabled' : ''}><option value="">${leerText}</option>${Object.entries(GRUPPEN).map(([k, v]) =>
+    `<option value="${k}" ${wert === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
+}
 function geraetForm(g) {
   const neu = !g, darfPool = neu || vonMir(g), m = g ? mein(g.id) : null;
   const d = g || { name: '', kategorie: '' };
@@ -462,25 +535,41 @@ function geraetForm(g) {
     <h2>${neu ? 'Neues Gerät im Pool' : esc(g.name)}</h2>
     <div class="abschnitt">Gerät (für alle sichtbar)</div>
     <label>Name<input name="name" value="${esc(d.name)}" placeholder="z. B. Brustpresse" required ${darfPool ? '' : 'disabled'}></label>
-    <label>Muskelgruppe<input name="kategorie" list="katList" value="${esc(d.kategorie)}" placeholder="optional" ${darfPool ? '' : 'disabled'}></label>
+    <div class="grid2">
+      <label>Muskelgruppe<input name="kategorie" list="katList" value="${esc(d.kategorie || (neu ? '' : ausName(d.name).kategorie || ''))}" placeholder="optional" ${darfPool ? '' : 'disabled'}></label>
+      <label>Push / Pull${gruppeSelect('gruppe', d.gruppe || (neu ? '' : ausName(d.name).gruppe || ''), !darfPool)}</label>
+    </div>
     <datalist id="katList">${KATEGORIEN.map(k => `<option value="${k}">`).join('')}</datalist>
-    ${darfPool ? '' : '<p class="muted small" style="margin:6px 0 0">Von jemand anderem angelegt – Name und Muskelgruppe kann nur der Ersteller ändern.</p>'}
+    <p class="muted small" id="vorschlagHinweis" style="margin:6px 0 0">${darfPool ? (neu ? 'Wird beim Tippen des Namens vorgeschlagen – du kannst es ändern.' : '') : 'Von jemand anderem angelegt – Name, Muskelgruppe und Push/Pull für alle kann nur der Ersteller ändern. Deine eigene Zuordnung kannst du unten festlegen.'}</p>
     ${zeigePers ? `<div class="abschnitt">Meine Einstellungen (nur für dich)</div>
     <div class="grid2">
       <label>Sätze (beim 1. Mal)<input name="saetze" type="number" inputmode="numeric" min="1" max="10" value="${pers.saetze}" required></label>
       <label>Pause (Sek.)<input name="pause" type="number" inputmode="numeric" min="0" value="${pers.pause_sek}" required></label>
     </div>
     <label>Meine Einstellung am Gerät<input name="notiz" value="${esc(pers.notiz)}" placeholder="z. B. Sitz Stufe 4, Lehne 2"></label>
+    ${!darfPool ? `<label>Meine Push/Pull-Zuordnung${gruppeSelect('meinegruppe', pers.gruppe || '', false, 'wie für alle' + (g && (g.gruppe || ausName(g.name).gruppe) ? ` (${GRUPPEN[g.gruppe || ausName(g.name).gruppe]})` : ''))}</label>` : ''}
     ${neu ? '' : `<label class="check"><input type="checkbox" name="pausiert" ${pers.pausiert ? 'checked' : ''}> Pausiert (derzeit nicht genutzt)</label>`}`
     : `<div class="abschnitt">Mein Training</div><button type="button" class="ghost block" id="favAn">☆ In mein Training übernehmen</button>`}
     <div class="actions">${!neu && darfPool ? '<button type="button" class="ghost danger" id="delG">Löschen</button><span class="spacer"></span>' : ''}
       <button type="button" class="ghost" data-close>Abbrechen</button>${darfPool || zeigePers ? '<button class="primary" type="submit">Speichern</button>' : ''}</div>
   </form>`);
-  const persWerte = f => ({ saetze: +f.saetze.value, pause_sek: +f.pause.value, notiz: f.notiz.value.trim() || null, ...(f.pausiert ? { pausiert: f.pausiert.checked } : {}) });
+  const persWerte = f => ({ saetze: +f.saetze.value, pause_sek: +f.pause.value, notiz: f.notiz.value.trim() || null,
+    ...(f.pausiert ? { pausiert: f.pausiert.checked } : {}), ...(f.meinegruppe ? { gruppe: f.meinegruppe.value || null } : {}) });
+  // Beim neuen Gerät: Muskelgruppe und Push/Pull aus dem Namen vorschlagen, solange nicht selbst geändert
+  if (neu) {
+    const f = $('#gF'); let katSelbst = false, grSelbst = false;
+    f.kategorie.addEventListener('input', () => katSelbst = true);
+    f.gruppe.addEventListener('change', () => grSelbst = true);
+    f.name.addEventListener('input', () => {
+      const v = ausName(f.name.value);
+      if (!katSelbst) f.kategorie.value = v.kategorie || '';
+      if (!grSelbst) f.gruppe.value = v.gruppe || '';
+    });
+  }
   $('#favAn')?.addEventListener('click', async () => { await favoritAn(g); toast('★ In dein Training übernommen'); geraetForm(g); render(); });
   $('#gF').onsubmit = async ev => {
     ev.preventDefault(); const f = ev.target;
-    const pool = { name: f.name.value.trim(), kategorie: f.kategorie.value.trim() || null };
+    const pool = { name: f.name.value.trim(), kategorie: f.kategorie.value.trim() || null, gruppe: f.gruppe.value || null };
     if (neu) {
       const gleich = S.geraete.find(x => x.name.trim().toLowerCase() === pool.name.toLowerCase());
       if (gleich) {
@@ -490,7 +579,7 @@ function geraetForm(g) {
       const ng = await q(sb.from('geraete').insert(pool).select().single());
       S.geraete.push(ng); await favoritAn(ng, persWerte(f));
     } else {
-      if (darfPool && (pool.name !== g.name || pool.kategorie !== (g.kategorie || null)))
+      if (darfPool && (pool.name !== g.name || pool.kategorie !== (g.kategorie || null) || pool.gruppe !== (g.gruppe || null)))
         Object.assign(g, await q(sb.from('geraete').update(pool).eq('id', g.id).select().single()));
       if (m) Object.assign(m, await q(sb.from('meine_geraete').update(persWerte(f)).eq('user_id', S.user.id).eq('geraet_id', g.id).select().single()));
     }
